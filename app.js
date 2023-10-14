@@ -4,8 +4,12 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const _ = require("lodash");
+const bcrypt = require("bcrypt");
+const { render } = require("ejs");
 // const encrypt = require("mongoose-encryption");
-const md5 = require("md5");
+// const md5 = require("md5");
+
+const saltRounds = 10;
 
 const app = express();
 
@@ -49,15 +53,17 @@ app.get("/login", function (req, res) {
 
 app.post("/login", async function (req, res) {
   const username = req.body.username;
-  const password = md5(req.body.password);
+  const password = req.body.password;
 
   const checkUser = await User.findOne({ name: username });
 
   if (checkUser) {
-    if (checkUser.password == password) {
-      console.log("Login succesful");
-      res.render("secrets");
-    }
+    bcrypt.compare(password, checkUser.password, function (err, result) {
+      if (result === true) {
+        console.log("Login successful");
+        res.render("secrets");
+      }
+    });
   } else {
     console.log("Login failed");
     res.redirect("/login");
@@ -71,20 +77,22 @@ app.get("/register", function (req, res) {
 });
 
 app.post("/register", function (req, res) {
-  const newUser = new User({
-    name: req.body.username,
-    password: md5(req.body.password),
+  bcrypt.hash(req.body.password, saltRounds, function (err, hash) {
+    const newUser = new User({
+      name: req.body.username,
+      password: hash,
+    });
+
+    const checkResult = newUser.save();
+
+    if (!checkResult) {
+      console.log("Register failed.");
+      res.redirect("/register");
+    } else {
+      console.log("Register successful");
+      res.redirect("/secrets");
+    }
   });
-
-  const checkResult = newUser.save();
-
-  if (!checkResult) {
-    console.log("Register failed.");
-    res.redirect("/register");
-  } else {
-    console.log("Register successful");
-    res.redirect("/secrets");
-  }
 });
 
 //secrets
